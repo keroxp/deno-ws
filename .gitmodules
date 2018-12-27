@@ -1,0 +1,3 @@
+[submodule "deps/https/deno.land/x/std"]
+	path = deps/https/deno.land/x/std
+	url = https://github.com/denoland/deno_std
