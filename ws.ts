@@ -1,4 +1,4 @@
-import {Conn, Buffer} from "deno"
+import {Buffer, Writer, Conn} from "deno"
 import {ServerRequest} from "./deps/https/deno.land/x/std/net/http.ts";
 import {BufReader, BufWriter} from "./deps/https/deno.land/x/std/net/bufio.ts";
 import {readLong, readShort, sliceLongToBytes, stringToBytes} from "./ioutil.ts";
@@ -68,6 +68,7 @@ class WebSocket {
                             yield concat
                         }
                         frames = [];
+                        payloadsLength = 0;
                     }
                     break;
                 case OpCodeClose:
@@ -88,17 +89,13 @@ class WebSocket {
     async send(data: string | Uint8Array) {
         const opcode = typeof data === "string" ? OpCodeTextFrame : OpCodeBinaryFrame;
         const payload = typeof data === "string" ? stringToBytes(data) : data;
-        let written = payload.length;
-        while (written < payload.length) {
-            const l = Math.min(0xffffffff, payload.length - written);
-            const isLastFrame = payload.length - written - l === 0;
-            await writeFrame({
-                isLastFrame,
-                opcode: written === 0 ? opcode : OpCodeContinue,
-                payload: payload.subarray(written, l),
-                mask: this.mask,
-            }, this.conn)
-        }
+        const isLastFrame = true;
+        await writeFrame({
+            isLastFrame,
+            opcode,
+            payload,
+            mask: this.mask,
+        }, this.conn);
     }
 
     async ping(data: string | Uint8Array) {
@@ -144,8 +141,8 @@ class WebSocket {
 
 export async function* receive(conn: Conn): AsyncIterableIterator<WebSocketFrame> {
     let receiving = true;
-    const reader = new BufReader(conn);
     while (receiving) {
+        const reader = new BufReader(conn);
         const frame = await readFrame(reader);
         switch (frame.opcode) {
             case OpCodeTextFrame:
@@ -178,14 +175,14 @@ export async function* receive(conn: Conn): AsyncIterableIterator<WebSocketFrame
     }
 }
 
-export async function writeFrame(frame: WebSocketFrame, conn: Conn) {
-    let payloadLength = frame.payload.length;
+export async function writeFrame(frame: WebSocketFrame, writer: Writer) {
+    let payloadLength = frame.payload.byteLength;
     let header: Uint8Array;
     const hasMask = (frame.mask ? 1 : 0) << 7;
     if (payloadLength < 126) {
         header = new Uint8Array([
             (0b1000 << 4) | frame.opcode,
-            (hasMask | (payloadLength & 0xff))
+            (hasMask | payloadLength)
         ]);
     } else if (payloadLength < 0xffff) {
         header = new Uint8Array([
@@ -201,9 +198,15 @@ export async function writeFrame(frame: WebSocketFrame, conn: Conn) {
             ...sliceLongToBytes(payloadLength)
         ]);
     }
-    await conn.write(header);
-    unmask(frame.payload, frame.mask    );
-    await conn.write(frame.payload);
+    if (frame.mask) {
+        unmask(frame.payload, frame.mask);
+    }
+    const bytes = new Uint8Array(header.length + payloadLength);
+    bytes.set(header, 0);
+    bytes.set(frame.payload, header.length);
+    const w = new BufWriter(writer);
+    await w.write(bytes);
+    await w.flush();
 }
 
 export function unmask(payload: Uint8Array, mask: Uint8Array) {
@@ -214,10 +217,10 @@ export function unmask(payload: Uint8Array, mask: Uint8Array) {
     }
 }
 export async function acceptWebSocket(req: ServerRequest): Promise<[boolean, WebSocket]> {
-    if (req.headers["upgrade"]) {
+    if (req.headers.has("upgrade")) {
         const sock = new WebSocket(req.conn);
-        const secKey = req.headers["sec-websocket-key"];
-        const secAccept = createHashFromNonce(secKey);
+        const secKey = req.headers.get("sec-websocket-key");
+        const secAccept = createSecAccept(secKey);
         await req.respond({
             status: 101,
             headers: new Headers({
@@ -232,10 +235,12 @@ export async function acceptWebSocket(req: ServerRequest): Promise<[boolean, Web
 }
 
 const kGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-function createHashFromNonce(nonce: string) {
+export function createSecAccept(nonce: string) {
     const sha1 = new Sha1();
     sha1.update(nonce + kGUID);
-    return btoa(sha1.hex());
+    const bytes = sha1.digest();
+    const hash = bytes.reduce((data, byte) => data + String.fromCharCode(byte), "");
+    return btoa(hash);
 }
 
 export async function readFrame(buf: BufReader): Promise<WebSocketFrame> {

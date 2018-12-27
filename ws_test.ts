@@ -4,8 +4,17 @@ import {
     test,
     assert,
     assertEqual
-} from "./deps/https/deno.land/x/testing/testing.ts";
-import {OpCodeBinaryFrame, OpCodeContinue, OpcodePing, OpcodePong, OpCodeTextFrame, readFrame, unmask} from "./ws.ts";
+} from "https://deno.land/x/testing/testing.ts";
+import {
+    createSecAccept,
+    OpCodeBinaryFrame,
+    OpCodeContinue,
+    OpcodePing,
+    OpcodePong,
+    OpCodeTextFrame,
+    readFrame,
+    unmask
+} from "./ws.ts";
 
 test(async function testReadFrame() {
     // unmasked single text frame with payload "Hello"
@@ -96,4 +105,10 @@ test(async function f4() {
     assertEqual(bin.isLastFrame, true);
     assertEqual(bin.mask, undefined);
     assertEqual(bin.payload.length, 0xffff + 1);
+});
+
+test(async function testCreateSecAccept() {
+    const nonce = "dGhlIHNhbXBsZSBub25jZQ==";
+    const d = createSecAccept(nonce);
+    assertEqual(d, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
 });

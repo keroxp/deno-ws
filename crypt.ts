@@ -61,6 +61,8 @@ export class Sha1 {
         let notString = typeof(data) !== 'string';
         if (notString && data instanceof ArrayBuffer) {
             message = new Uint8Array(data);
+        } else {
+            message = data;
         }
         let code, index = 0, i, length = message.length || 0, blocks = this.blocks;
 
@@ -315,7 +317,7 @@ export class Sha1 {
         return this.digest();
     };
 
-    arrayBuffe() {
+    arrayBuffer() {
         this.finalize();
 
         let buffer = new ArrayBuffer(20);
