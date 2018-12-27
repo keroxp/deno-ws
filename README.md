@@ -1,3 +1,3 @@
-deno-ts
+deno-ws
 ===
-A experimental websocket implementation for deno.ts
+An experimental websocket implementation for deno.ts
