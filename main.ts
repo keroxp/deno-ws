@@ -1,4 +1,4 @@
-import {serve} from "./deps/https/deno.land/x/std/net/http.ts";
+import {serve} from "https://deno.land/x/net/http.ts";
 import {acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "./ws.ts";
 
 async function main() {

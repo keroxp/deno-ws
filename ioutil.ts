@@ -1,4 +1,4 @@
-import {BufReader} from  "./deps/https/deno.land/x/std/net/bufio.ts";
+import {BufReader} from  "https://deno.land/x/net/bufio.ts";
 
 export async function readShort(buf: BufReader) {
     const [high, low] = [

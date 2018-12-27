@@ -1,6 +1,6 @@
 import {Buffer, Writer, Conn} from "deno"
-import {ServerRequest} from "./deps/https/deno.land/x/std/net/http.ts";
-import {BufReader, BufWriter} from "./deps/https/deno.land/x/std/net/bufio.ts";
+import {ServerRequest} from "https://deno.land/x/net/http.ts";
+import {BufReader, BufWriter} from "https://deno.land/x/net/bufio.ts";
 import {readLong, readShort, sliceLongToBytes, stringToBytes} from "./ioutil.ts";
 import {Sha1} from "./crypt.ts";
 

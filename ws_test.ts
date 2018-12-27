@@ -1,5 +1,5 @@
 import {Buffer} from "deno";
-import {BufReader} from "./deps/https/deno.land/x/std/net/bufio.ts"
+import {BufReader} from "https://deno.land/x/net/bufio.ts"
 import {
     test,
     assert,
