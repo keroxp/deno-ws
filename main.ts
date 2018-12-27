@@ -1,10 +1,10 @@
 import {serve} from "./deps/https/deno.land/x/std/net/http.ts";
-import {acceptable, acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "./ws.ts";
+import {acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "./ws.ts";
 
 async function main() {
     console.log("websocket server is running on 0.0.0.0:8080");
     for await (const req of serve("0.0.0.0:8080")) {
-        if (acceptable(req)) {
+        if (req.url === "/ws") {
             (async () => {
                 const [err, sock] = await acceptWebSocket(req);
                 if (err) return;
@@ -28,14 +28,6 @@ async function main() {
                     }
                 }
             })();
-        } else {
-            await req.respond({
-                status: 200,
-                headers: new Headers({
-                    "Content-Type": "text/plain"
-                }),
-                body: new TextEncoder().encode("Hello!")
-            });
         }
     }
 }
