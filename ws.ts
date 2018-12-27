@@ -18,15 +18,19 @@ export type WebSocketCloseEvent = {
     code: number
     reason?: string
 };
+
 export function isWebSocketCloseEvent(a): a is WebSocketCloseEvent {
     return a && typeof a["code"] === "number"
 }
 
 export type WebSocketPingEvent = ["ping", Uint8Array]
+
 export function isWebSocketPingEvent(a): a is WebSocketPingEvent {
     return Array.isArray(a) && a[0] === "ping" && a[1] instanceof Uint8Array;
 }
+
 export type WebSocketPongEvent = ["pong", Uint8Array]
+
 export function isWebSocketPongEvent(a): a is WebSocketPongEvent {
     return Array.isArray(a) && a[0] === "pong" && a[1] instanceof Uint8Array;
 }
@@ -46,6 +50,7 @@ class WebSocket {
         let frames: WebSocketFrame[] = [];
         let payloadsLength = 0;
         for await (const frame of receive(this.conn)) {
+            console.log(frame);
             unmask(frame.payload, frame.mask);
             switch (frame.opcode) {
                 case OpCodeTextFrame:
@@ -141,8 +146,8 @@ class WebSocket {
 
 export async function* receive(conn: Conn): AsyncIterableIterator<WebSocketFrame> {
     let receiving = true;
+    const reader = new BufReader(conn);
     while (receiving) {
-        const reader = new BufReader(conn);
         const frame = await readFrame(reader);
         switch (frame.opcode) {
             case OpCodeTextFrame:
@@ -216,25 +221,36 @@ export function unmask(payload: Uint8Array, mask: Uint8Array) {
         }
     }
 }
-export async function acceptWebSocket(req: ServerRequest): Promise<[boolean, WebSocket]> {
-    if (req.headers.has("upgrade")) {
-        const sock = new WebSocket(req.conn);
-        const secKey = req.headers.get("sec-websocket-key");
-        const secAccept = createSecAccept(secKey);
-        await req.respond({
-            status: 101,
-            headers: new Headers({
-                "Upgrade": "websocket",
-                "Connection": "Upgrade",
-                "Sec-WebSocket-Accept": secAccept,
-            })
-        });
-        return [true, sock];
+
+export function acceptable(req: ServerRequest): boolean {
+    return req.headers.get("upgrade") === "websocket"
+        && req.headers.has("sec-websocket-key")
+}
+
+export async function acceptWebSocket(req: ServerRequest): Promise<[Error, WebSocket]> {
+    if (acceptable(req)) {
+        try {
+            const sock = new WebSocket(req.conn);
+            const secKey = req.headers.get("sec-websocket-key");
+            const secAccept = createSecAccept(secKey);
+            await req.respond({
+                status: 101,
+                headers: new Headers({
+                    "Upgrade": "websocket",
+                    "Connection": "Upgrade",
+                    "Sec-WebSocket-Accept": secAccept,
+                })
+            });
+            return [null, sock];
+        } catch (e) {
+            return [e, null]
+        }
     }
-    return [false, null];
+    return [new Error("request is not acceptable"), null];
 }
 
 const kGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
 export function createSecAccept(nonce: string) {
     const sha1 = new Sha1();
     sha1.update(nonce + kGUID);
