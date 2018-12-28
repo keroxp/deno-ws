@@ -10,7 +10,7 @@ async function main() {
                 const [err, sock] = await acceptWebSocket(req);
                 if (err) return;
                 console.log("socket connected!");
-                for await (const ev of sock.handle()) {
+                for await (const ev of sock.receive()) {
                     if (typeof ev === "string") {
                         // text message
                         console.log("ws:Text", ev);

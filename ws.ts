@@ -4,6 +4,7 @@ import {ServerRequest} from "https://deno.land/x/net/http.ts";
 import {BufReader, BufWriter} from "https://deno.land/x/net/bufio.ts";
 import {readLong, readShort, sliceLongToBytes, stringToBytes} from "./ioutil.ts";
 import {Sha1} from "./crypt.ts";
+import {SocketClosedError} from "./errors.ts";
 
 export const OpCodeContinue = 0x0;
 export const OpCodeTextFrame = 0x1;
@@ -43,15 +44,22 @@ export type WebSocketFrame = {
     payload: Uint8Array
 }
 
-class WebSocket {
+export type WebSocket = {
+    readonly isClosed: boolean
+    receive(): AsyncIterableIterator<WebSocketEvent>
+    send(data: string | Uint8Array): Promise<Error>
+    ping(data?: string | Uint8Array): Promise<Error>
+    close(code: number, reason?: string): Promise<Error>
+}
+
+class WebSocketImpl implements WebSocket {
     constructor(private conn: Conn, private mask?: Uint8Array) {
     }
 
-    async* handle(): AsyncIterableIterator<WebSocketEvent> {
+    async* receive(): AsyncIterableIterator<WebSocketEvent> {
         let frames: WebSocketFrame[] = [];
         let payloadsLength = 0;
-        for await (const frame of receive(this.conn)) {
-            console.log(frame);
+        for await (const frame of receiveFrame(this.conn)) {
             unmask(frame.payload, frame.mask);
             switch (frame.opcode) {
                 case OpCodeTextFrame:
@@ -80,6 +88,7 @@ class WebSocket {
                 case OpCodeClose:
                     const code = (frame.payload[0] << 16) | frame.payload[1];
                     const reason = new Buffer(frame.payload.subarray(2, frame.payload.length)).toString();
+                    this._isClosed = true;
                     yield {code, reason};
                     return;
                 case OpcodePing:
@@ -92,26 +101,37 @@ class WebSocket {
         }
     }
 
-    async send(data: string | Uint8Array) {
+    async send(data: string | Uint8Array): Promise<SocketClosedError> {
+        if (this.isClosed) {
+            return new SocketClosedError("socket has been closed")
+        }
         const opcode = typeof data === "string" ? OpCodeTextFrame : OpCodeBinaryFrame;
         const payload = typeof data === "string" ? stringToBytes(data) : data;
         const isLastFrame = true;
-        await writeFrame({
-            isLastFrame,
-            opcode,
-            payload,
-            mask: this.mask,
-        }, this.conn);
+        try {
+            await writeFrame({
+                isLastFrame,
+                opcode,
+                payload,
+                mask: this.mask,
+            }, this.conn);
+        } catch (e) {
+            return e;
+        }
     }
 
-    async ping(data: string | Uint8Array) {
+    async ping(data: string | Uint8Array): Promise<Error> {
         const payload = typeof data === "string" ? stringToBytes(data) : data;
-        await writeFrame({
-            isLastFrame: true,
-            opcode: OpCodeClose,
-            mask: this.mask,
-            payload
-        }, this.conn)
+        try {
+            await writeFrame({
+                isLastFrame: true,
+                opcode: OpCodeClose,
+                mask: this.mask,
+                payload
+            }, this.conn)
+        } catch (e) {
+            return e;
+        }
     }
 
     private _isClosed = false;
@@ -119,7 +139,7 @@ class WebSocket {
         return this._isClosed;
     }
 
-    async close(code: number, reason?: string) {
+    async close(code: number, reason?: string): Promise<Error> {
         try {
             const header = [
                 (code >>> 8), (code & 0x00ff)
@@ -139,13 +159,27 @@ class WebSocket {
                 mask: this.mask,
                 payload
             }, this.conn);
+        } catch (e) {
+            return e;
+        } finally {
+            this.ensureSocketClosed();
+        }
+    }
+
+    private ensureSocketClosed(): Error {
+        if (this.isClosed) return;
+        try {
+            this.conn.close()
+        } catch (e) {
+            console.error(e);
         } finally {
             this._isClosed = true;
         }
     }
 }
 
-export async function* receive(conn: Conn): AsyncIterableIterator<WebSocketFrame> {
+
+export async function* receiveFrame(conn: Conn): AsyncIterableIterator<WebSocketFrame> {
     let receiving = true;
     const reader = new BufReader(conn);
     while (receiving) {
@@ -231,7 +265,7 @@ export function acceptable(req: ServerRequest): boolean {
 export async function acceptWebSocket(req: ServerRequest): Promise<[Error, WebSocket]> {
     if (acceptable(req)) {
         try {
-            const sock = new WebSocket(req.conn);
+            const sock = new WebSocketImpl(req.conn);
             const secKey = req.headers.get("sec-websocket-key");
             const secAccept = createSecAccept(secKey);
             await req.respond({
