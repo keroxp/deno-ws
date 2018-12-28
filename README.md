@@ -18,11 +18,12 @@ async function main() {
                 const [err, sock] = await acceptWebSocket(req);
                 if (err) return;
                 console.log("socket connected!");
-                for await (const ev of sock.handle()) {
+                for await (const ev of sock.receive()) {
                     if (typeof ev === "string") {
                         // text message
                         console.log("ws:Text", ev);
-                        await sock.send(ev);
+                        cosnt err = await sock.send(ev);
+                        if (err) console.err(err);
                     } else if (ev instanceof Uint8Array) {
                         // binary message
                         console.log("ws:Binary", ev);
