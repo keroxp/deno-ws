@@ -1,3 +1,4 @@
+// Copyright 2018 Yusuke Sakurai. All rights reserved. MIT license.
 import {Buffer, Writer, Conn} from "deno"
 import {ServerRequest} from "https://deno.land/x/net/http.ts";
 import {BufReader, BufWriter} from "https://deno.land/x/net/bufio.ts";

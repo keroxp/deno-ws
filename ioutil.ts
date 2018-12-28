@@ -1,3 +1,4 @@
+// Copyright 2018 Yusuke Sakurai. All rights reserved. MIT license.
 import {BufReader} from  "https://deno.land/x/net/bufio.ts";
 
 export async function readShort(buf: BufReader) {
@@ -5,7 +6,6 @@ export async function readShort(buf: BufReader) {
         await buf.readByte(),
         await buf.readByte()
     ];
-    console.log(high, low)
     return (high << 8) | low;
 }
 

@@ -1,3 +1,4 @@
+// Copyright 2018 Yusuke Sakurai. All rights reserved. MIT license.
 import {serve} from "https://deno.land/x/net/http.ts";
 import {acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "./ws.ts";
 

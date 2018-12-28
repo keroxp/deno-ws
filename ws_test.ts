@@ -1,3 +1,4 @@
+// Copyright 2018 Yusuke Sakurai. All rights reserved. MIT license.
 import {Buffer} from "deno";
 import {BufReader} from "https://deno.land/x/net/bufio.ts"
 import {
