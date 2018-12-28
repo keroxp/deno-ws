@@ -4,7 +4,7 @@ An experimental websocket implementation for deno.ts
 
 ## Usage
 
-!! Experimental !!
+Working with "https://deno.land/x/net/http.ts"
 
 ```ts
 import {serve} from "https://deno.land/x/net/http.ts";
@@ -22,7 +22,7 @@ async function main() {
                     if (typeof ev === "string") {
                         // text message
                         console.log("ws:Text", ev);
-                        cosnt err = await sock.send(ev);
+                        const err = await sock.send(ev);
                         if (err) console.err(err);
                     } else if (ev instanceof Uint8Array) {
                         // binary message
