@@ -2,7 +2,7 @@
 import {Buffer, Writer, Conn} from "deno"
 import {ServerRequest} from "https://deno.land/x/net/http.ts";
 import {BufReader, BufWriter} from "https://deno.land/x/net/bufio.ts";
-import {readLong, readShort, sliceLongToBytes, stringToBytes} from "./ioutil.ts";
+import {readLong, readShort, sliceLongToBytes} from "./ioutil.ts";
 import {Sha1} from "./crypt.ts";
 import {SocketClosedError} from "./errors.ts";
 
@@ -53,6 +53,7 @@ export type WebSocket = {
 }
 
 class WebSocketImpl implements WebSocket {
+    encoder = new TextEncoder();
     constructor(private conn: Conn, private mask?: Uint8Array) {
     }
 
@@ -106,7 +107,7 @@ class WebSocketImpl implements WebSocket {
             return new SocketClosedError("socket has been closed")
         }
         const opcode = typeof data === "string" ? OpCodeTextFrame : OpCodeBinaryFrame;
-        const payload = typeof data === "string" ? stringToBytes(data) : data;
+        const payload = typeof data === "string" ? this.encoder.encode(data) : data;
         const isLastFrame = true;
         try {
             await writeFrame({
@@ -121,7 +122,7 @@ class WebSocketImpl implements WebSocket {
     }
 
     async ping(data: string | Uint8Array): Promise<Error> {
-        const payload = typeof data === "string" ? stringToBytes(data) : data;
+        const payload = typeof data === "string" ? this.encoder.encode(data) : data;
         try {
             await writeFrame({
                 isLastFrame: true,
@@ -146,8 +147,8 @@ class WebSocketImpl implements WebSocket {
             ];
             let payload: Uint8Array;
             if (reason) {
-                const reasonBytes = stringToBytes(reason);
-                payload = new Uint8Array(2 + reasonBytes.length);
+                const reasonBytes = this.encoder.encode(reason);
+                payload = new Uint8Array(2 + reasonBytes.byteLength);
                 payload.set(header);
                 payload.set(reasonBytes, 2);
             } else {

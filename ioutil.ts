@@ -35,19 +35,3 @@ export function sliceLongToBytes(d: number, dest = new Array(8)): number[] {
     }
     return dest;
 }
-
-
-export function stringToBytes(s: string) {
-    const bytes = new Uint8Array(s.length * 2);
-    let pos = 0;
-    for (const c of s) {
-        const code = c.charCodeAt(0);
-        const [h, l] = [
-            code >>> 8,
-            code & 0x00ff
-        ];
-        bytes[pos++] = h;
-        bytes[pos++] = l;
-    }
-    return bytes;
-}
