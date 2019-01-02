@@ -1,14 +1,13 @@
 // Copyright 2018 Yusuke Sakurai. All rights reserved. MIT license.
 import {serve} from "https://deno.land/x/net/http.ts";
-import {acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "./ws.ts";
+import {acceptWebSocket, isWebSocketCloseEvent, isWebSocketPingEvent} from "../ws.ts";
 
 async function main() {
     console.log("websocket server is running on 0.0.0.0:8080");
     for await (const req of serve("0.0.0.0:8080")) {
         if (req.url === "/ws") {
             (async () => {
-                const [err, sock] = await acceptWebSocket(req);
-                if (err) return;
+                const sock = await acceptWebSocket(req);
                 console.log("socket connected!");
                 for await (const ev of sock.receive()) {
                     if (typeof ev === "string") {

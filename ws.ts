@@ -47,9 +47,9 @@ export type WebSocketFrame = {
 export type WebSocket = {
     readonly isClosed: boolean
     receive(): AsyncIterableIterator<WebSocketEvent>
-    send(data: string | Uint8Array): Promise<Error>
-    ping(data?: string | Uint8Array): Promise<Error>
-    close(code: number, reason?: string): Promise<Error>
+    send(data: string | Uint8Array): Promise<void>
+    ping(data?: string | Uint8Array): Promise<void>
+    close(code: number, reason?: string): Promise<void>
 }
 
 class WebSocketImpl implements WebSocket {
@@ -102,37 +102,29 @@ class WebSocketImpl implements WebSocket {
         }
     }
 
-    async send(data: string | Uint8Array): Promise<SocketClosedError> {
+    async send(data: string | Uint8Array): Promise<void> {
         if (this.isClosed) {
-            return new SocketClosedError("socket has been closed")
+            throw new SocketClosedError("socket has been closed")
         }
         const opcode = typeof data === "string" ? OpCodeTextFrame : OpCodeBinaryFrame;
         const payload = typeof data === "string" ? this.encoder.encode(data) : data;
         const isLastFrame = true;
-        try {
-            await writeFrame({
-                isLastFrame,
-                opcode,
-                payload,
-                mask: this.mask,
-            }, this.conn);
-        } catch (e) {
-            return e;
-        }
+        await writeFrame({
+            isLastFrame,
+            opcode,
+            payload,
+            mask: this.mask,
+        }, this.conn);
     }
 
-    async ping(data: string | Uint8Array): Promise<Error> {
+    async ping(data: string | Uint8Array): Promise<void> {
         const payload = typeof data === "string" ? this.encoder.encode(data) : data;
-        try {
-            await writeFrame({
-                isLastFrame: true,
-                opcode: OpCodeClose,
-                mask: this.mask,
-                payload
-            }, this.conn)
-        } catch (e) {
-            return e;
-        }
+        await writeFrame({
+            isLastFrame: true,
+            opcode: OpCodeClose,
+            mask: this.mask,
+            payload
+        }, this.conn)
     }
 
     private _isClosed = false;
@@ -140,7 +132,7 @@ class WebSocketImpl implements WebSocket {
         return this._isClosed;
     }
 
-    async close(code: number, reason?: string): Promise<Error> {
+    async close(code: number, reason?: string): Promise<void> {
         try {
             const header = [
                 (code >>> 8), (code & 0x00ff)
@@ -161,7 +153,7 @@ class WebSocketImpl implements WebSocket {
                 payload
             }, this.conn);
         } catch (e) {
-            return e;
+            throw e;
         } finally {
             this.ensureSocketClosed();
         }
@@ -263,26 +255,22 @@ export function acceptable(req: ServerRequest): boolean {
         && req.headers.has("sec-websocket-key")
 }
 
-export async function acceptWebSocket(req: ServerRequest): Promise<[Error, WebSocket]> {
+export async function acceptWebSocket(req: ServerRequest): Promise<WebSocket> {
     if (acceptable(req)) {
-        try {
-            const sock = new WebSocketImpl(req.conn);
-            const secKey = req.headers.get("sec-websocket-key");
-            const secAccept = createSecAccept(secKey);
-            await req.respond({
-                status: 101,
-                headers: new Headers({
-                    "Upgrade": "websocket",
-                    "Connection": "Upgrade",
-                    "Sec-WebSocket-Accept": secAccept,
-                })
-            });
-            return [null, sock];
-        } catch (e) {
-            return [e, null]
-        }
+        const sock = new WebSocketImpl(req.conn);
+        const secKey = req.headers.get("sec-websocket-key");
+        const secAccept = createSecAccept(secKey);
+        await req.respond({
+            status: 101,
+            headers: new Headers({
+                "Upgrade": "websocket",
+                "Connection": "Upgrade",
+                "Sec-WebSocket-Accept": secAccept,
+            })
+        });
+        return sock;
     }
-    return [new Error("request is not acceptable"), null];
+    throw new Error("request is not acceptable");
 }
 
 const kGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

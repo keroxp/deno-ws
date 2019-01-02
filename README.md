@@ -15,15 +15,17 @@ async function main() {
     for await (const req of serve("0.0.0.0:8080")) {
         if (req.url === "/ws") {
             (async () => {
-                const [err, sock] = await acceptWebSocket(req);
-                if (err) return;
+                try {
+                    const sock = await acceptWebSocket(req);
+                } catch (e) {
+                    console.error(e);
+                }
                 console.log("socket connected!");
                 for await (const ev of sock.receive()) {
                     if (typeof ev === "string") {
                         // text message
                         console.log("ws:Text", ev);
                         const err = await sock.send(ev);
-                        if (err) console.err(err);
                     } else if (ev instanceof Uint8Array) {
                         // binary message
                         console.log("ws:Binary", ev);

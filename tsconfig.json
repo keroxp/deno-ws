@@ -1,11 +1,15 @@
 {
   "compilerOptions": {
     "target": "es2018",
-    "lib": [
-      "dom",
-      "es2015",
-      "es2017.object",
-      "esnext.asynciterable"
-    ]
+    "baseUrl": ".",
+    "paths": {
+      "deno": ["./deno.d.ts"],
+      "http://*": [
+        "../../.deno/deps/https/*"
+      ],
+      "https://*": [
+        "../../.deno/deps/https/*"
+      ]
+    }
   }
 }
